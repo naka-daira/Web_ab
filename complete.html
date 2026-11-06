@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>申込完了 サンプル</title>
+<style>
+  body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #222; background: #fff; }
+  pre { font: 12px/1.4 monospace; background: #111; color: #0f0; padding: 8px; border-radius: 6px; white-space: pre-wrap; }
+</style>
+<!-- 完了ページにも同じ定義と共通スクリプトを入れる（振り分けはCookie/localStorageから復元） -->
+<script>
+  window.AB_CONFIG = { cookieDomain: '' };
+  window.AB_TESTS = [
+    { id: 'hdr_cta_2611',    method: 'ヘッダーCTA文言', slot: 3, groups: ['original', 'group_a'], cvEvent: 'cv', end: '2026-12-31' },
+    { id: 'ftr_banner_2611', method: 'フッターバナー',  slot: 4, groups: ['original', 'group_a'], cvEvent: 'cv', end: '2026-12-31' }
+  ];
+</script>
+<script src="ab-test.js"></script>
+<!-- GTMスニペット -->
+</head>
+<body>
+<h1>アカウント開設完了（サンプル）</h1>
+<p><a href="index.html">トップへ戻る</a></p>
+
+<!-- ページ到達型のCV：対象テストを省略すると、有効な全テストにCVが付く -->
+<script>abTest.convert();</script>
+
+<pre id="debug"></pre>
+<script>
+  document.getElementById('debug').textContent = '割り当て: ' + JSON.stringify(abTest.all()) + '\n\ndataLayer:\n' +
+    dataLayer.map(function (e) { return JSON.stringify(e); }).join('\n');
+</script>
+</body>
+</html>
