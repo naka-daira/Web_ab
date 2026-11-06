@@ -10,14 +10,23 @@
 
 <!-- ===== A/Bテスト（GTMスニペットより前） ===== -->
 <style>
-  html:not(.ab-js) [data-ab-variant]:not([data-ab-variant="A"]) { display: none; }
-  /* B案（仮） */
-  html[data-ab-hero_app_btn_2611="B"] .home-hero-button__type { background-color: #E8453C; }
+  html:not(.ab-js) [data-ab-variant]:not([data-ab-variant="original"]) { display: none; }
+  /* group_a（仮）：ボタン色だけ変える */
+  html[data-ab-hero_app_btn_2611="group_a"] .home-hero-button__type { background-color: #E8453C; }
 </style>
 <script>
   window.AB_CONFIG = { cookieDomain: '' }; // GitHub Pagesでは空のままでOK
   window.AB_TESTS = [
-    { id: 'hero_app_btn_2611', variants: ['A', 'B'], weights: [50, 50], end: '2026-12-31' }
+    {
+      id: 'hero_app_btn_2611',          // サイト内の識別子（英小文字・数字・_・-）
+      method: 'ヒーローボタン改善',       // = 判定側の test_id / method
+      slot: 2,                          // = 判定側 ab_param の customUser:ab_test_experiments_2
+      groups: ['original', 'group_a'],  // = 判定側 groups の値。先頭がオリジナル
+      weights: [50, 50],
+      cvEvent: 'cv',                    // = 判定側 cv_filter の event_name（'cv' or 'tcv'）
+      start: '2026-11-06',
+      end: '2026-12-31'
+    }
   ];
 </script>
 <script src="ab-test.js"></script>
@@ -59,7 +68,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <div class="home-hero-button" data-ab-test="hero_app_btn_2611">
             <!-- 検証用：本物のonelinkに飛ぶとアプリ計測側にクリックが残るため、遷移は止めています -->
             <a href="#" class="home-hero-button__type"
-               data-ab-cv="app_dl_click"
+               data-ab-cv
                onclick="sendTapEvent({event_category: 'VプリカHP', event_action: 'VプリカHP',event_label: 'アプリダウンロード'}); return false;">
               <p class="home-hero-button__text util-pc-hidden">Ｖプリカアプリをダウンロード</p>
               <p class="home-hero-button__text util-sp-hidden">Ｖプリカアプリについて</p>
@@ -84,8 +93,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     function render() {
       out.textContent = '割り当て: ' + JSON.stringify(abTest.all()) +
         '\nsendTapEvent: ' + (typeof sendTapEvent === 'function' ? 'OK（GTMで定義済み）' : '未定義') +
-        '\n\ndataLayer（ab_ / tap のみ）:\n' +
-        dataLayer.filter(function (e) { return e.event && /^(ab_|tap$)/.test(e.event); })
+        '\nCookie: ' + document.cookie +
+        '\n\ndataLayer（population / cv / tcv / tap のみ）:\n' +
+        dataLayer.filter(function (e) { return e.event && /^(population|t?cv|tap)$/.test(e.event); })
                  .map(function (e) { return JSON.stringify(e); }).join('\n');
     }
     // GTMが読み込み時に dataLayer.push を差し替えるため、フックせず定期的に描画する
