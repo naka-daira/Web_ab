@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>【検証用】A/Bテスト デモ</title>
+<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/home.css">
+
+<!-- ===== A/Bテスト（GTMスニペットより前） ===== -->
+<style>
+  html:not(.ab-js) [data-ab-variant]:not([data-ab-variant="original"]) { display: none; }
+  /* group_a（仮）：ボタン色だけ変える */
+  html[data-ab-hero_app_btn_2611="group_a"] .home-hero-button__type { background-color: #E8453C; }
+</style>
+<script>
+  window.AB_CONFIG = { cookieDomain: '' }; // GitHub Pagesでは空のままでOK
+  window.AB_TESTS = [
+    {
+      id: 'hero_app_btn_2611',          // サイト内の識別子（英小文字・数字・_・-）
+      method: 'ヒーローボタン改善',       // = 判定側の test_id / method
+      slot: 2,                          // = 判定側 ab_param の customUser:ab_test_experiments_2
+      groups: ['original', 'group_a'],  // = 判定側 groups の値。先頭がオリジナル
+      weights: [50, 50],
+      cvEvent: 'cv',                    // = 判定側 cv_filter の event_name（'cv' or 'tcv'）
+      start: '2026-11-06',
+      end: '2026-12-31'
+    }
+  ];
+</script>
+<script src="ab-test.js"></script>
+
+<!-- ===== Google Tag Manager ===== -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-KFFM8WP3');</script>
+<!-- End Google Tag Manager -->
+
+<style>
+  .test-banner { background: #333; color: #fff; text-align: center; font-size: 12px; padding: 6px; }
+  .test-banner a { color: #9cf; }
+  #debug { position: fixed; right: 8px; bottom: 8px; z-index: 9999; width: 380px; max-width: calc(100vw - 16px); max-height: 40vh; overflow: auto;
+           font: 11px/1.4 monospace; background: rgba(0,0,0,.85); color: #0f0; padding: 8px; border-radius: 6px; white-space: pre-wrap; }
+</style>
+</head>
+<body data-browser="chrome">
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KFFM8WP3"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<div class="test-banner">A/Bテスト計測の検証用ページです（公式サイトではありません）　<a href="sticky.html">追跡型CTAのテストへ →</a></div>
+
+<main id="main" class="Main"><div class="Main__inner"><div class="Main__body"><div class="Main__content">
+<div class="home-hero">
+  <div class="home-hero__inner">
+    <div class="home-hero__head">
+      <div class="home-hero__image"><img class="home-hero__image__front" src="assets/index_im01_01.webp" alt="アプリの画面を表示したスマホの上に2種類のＶプリカカードが重なったイメージ画像"> <img class="home-hero__image__rear" src="assets/index_im02.webp" alt="チャージ金額1,000円が表示されたスマホ画面"></div>
+    </div>
+    <div class="home-hero__body">
+      <h1 class="home-hero__title">誰でも持てる<br>Visaプリペイドカード</h1>
+      <p class="home-hero__lead"><span class="home-hero__lead__marker">チャージ式だから使い過ぎず安心</span></p>
+      <div class="home-hero__box-logoimg"><img src="assets/brandLogo.svg" alt="ロゴ"></div>
+      <div class="home-hero__box">
+        <div class="home-hero__app">
+          <div class="home-hero-button" data-ab-test="hero_app_btn_2611">
+            <!-- 検証用：本物のonelinkに飛ぶとアプリ計測側にクリックが残るため、遷移は止めています -->
+            <a href="#" class="home-hero-button__type"
+               data-ab-cv
+               onclick="sendTapEvent({event_category: 'VプリカHP', event_action: 'VプリカHP',event_label: 'アプリダウンロード'}); return false;">
+              <p class="home-hero-button__text util-pc-hidden">Ｖプリカアプリをダウンロード</p>
+              <p class="home-hero-button__text util-sp-hidden">Ｖプリカアプリについて</p>
+              <img class="home-hero-button__icon  util-pc-hidden" src="assets/icon_download.svg" alt="" width="268" height="98">
+            </a>
+          </div>
+        </div>
+      </div>
+      <p class="home-hero__attention__text">※Ｖプリカはブラウザからもご利用できます</p>
+    </div>
+  </div>
+</div>
+<div style="height:120vh;background:#f6f6f6"></div>
+</div></div></div></main>
+
+<pre id="debug"></pre>
+<script>
+  // 確認用パネル（?debug=0 で非表示）
+  (function () {
+    var out = document.getElementById('debug');
+    if (/[?&]debug=0/.test(location.search)) { out.remove(); return; }
+    function render() {
+      out.textContent = '割り当て: ' + JSON.stringify(abTest.all()) +
+        '\nsendTapEvent: ' + (typeof sendTapEvent === 'function' ? 'OK（GTMで定義済み）' : '未定義') +
+        '\nCookie: ' + document.cookie +
+        '\n\ndataLayer（population / cv / tcv / tap のみ）:\n' +
+        dataLayer.filter(function (e) { return e.event && /^(population|t?cv|tap)$/.test(e.event); })
+                 .map(function (e) { return JSON.stringify(e); }).join('\n');
+    }
+    // GTMが読み込み時に dataLayer.push を差し替えるため、フックせず定期的に描画する
+    render(); setInterval(render, 500);
+  })();
+</script>
+</body>
+</html>
