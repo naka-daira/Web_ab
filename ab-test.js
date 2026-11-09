@@ -6,7 +6,8 @@
  *   直前に window.AB_TESTS（テスト定義）を書いておく。
  *
  * 【GA4に送るもの（判定側 AB_TESTS の設定に合わせた形）】
- *   population イベント : 対象要素が画面に表示された（母数 / denominator_filter）
+ *   population イベント : 母数（denominator_filter）。テスト定義の population で送るタイミングを選ぶ
+ *                          'element'（既定）= 対象要素が画面に表示された時 / 'pageview' = 対象ページを開いた時
  *   cv（または tcv）イベント : CV（cv_filter）
  *     共通イベントパラメータ  : method = テスト名（例: 'ログイン成功率改善'）
  *   ユーザープロパティ       : ab_test_experiments_{slot} = グループ値（例: 'original' / 'group_a'）（ab_param）
@@ -85,7 +86,10 @@
         if (!write(KEY_PREFIX + t.id, g)) { g = t.groups[0]; enrolled = false; }
       }
     }
-    tests[t.id] = { group: g, method: t.method, slot: t.slot, cvEvent: t.cvEvent || 'cv', enrolled: enrolled };
+    tests[t.id] = {
+      group: g, method: t.method, slot: t.slot, cvEvent: t.cvEvent || 'cv', enrolled: enrolled,
+      population: t.population === 'pageview' ? 'pageview' : 'element'
+    };
     // CSSだけで差分を作る用: <html data-ab-{id}="group_a">
     root.setAttribute('data-ab-' + t.id, g);
     // マークアップを複数用意する用: 割り当て以外のグループを隠す
@@ -114,21 +118,35 @@
   }
 
   /* ---------- 母数（population） ---------- */
+  //   population: 'element'（既定）… 対象要素が画面に表示されたら送る
+  //   population: 'pageview'      … 対象ページ（data-ab-test 要素があるページ）を開いたら送る
+  //   どちらも、data-ab-test の要素が無いページ（到達型CVの完了ページなど）では送らない
+  var THRESHOLDS = [];
+  for (var s = 0; s <= 20; s++) THRESHOLDS.push(s / 20);
+  function isShown(en) {
+    if (!en.isIntersecting) return false;
+    if (en.intersectionRatio >= 0.5) return true;
+    // 画面より縦に長い要素は「画面の半分以上を占めたら表示」とみなす
+    var vh = (en.rootBounds && en.rootBounds.height) || w.innerHeight;
+    return en.intersectionRect.height >= vh * 0.5;
+  }
   function trackPopulation() {
     Object.keys(tests).forEach(function (id) {
-      var g = tests[id].group;
-      var sel = '[data-ab-test="' + id + '"][data-ab-variant="' + g + '"],' +
+      var t = tests[id];
+      if (!d.querySelector('[data-ab-test="' + id + '"]')) return;   // 対象ページでなければ送らない
+      if (t.population === 'pageview') { push('population', id); return; }
+      var sel = '[data-ab-test="' + id + '"][data-ab-variant="' + t.group + '"],' +
                 '[data-ab-test="' + id + '"]:not([data-ab-variant])';
       var els = d.querySelectorAll(sel);
-      if (!els.length) return;                    // このページに対象が無いテストは送らない
+      if (!els.length) return;                    // 割り当てグループの要素が無い場合も送らない
       var sent = false;
       var fire = function () { if (!sent) { sent = true; push('population', id); } };
       if (!('IntersectionObserver' in w)) { fire(); return; }
       var io = new IntersectionObserver(function (entries) {
         for (var i = 0; i < entries.length; i++) {
-          if (entries[i].isIntersecting) { fire(); io.disconnect(); return; }
+          if (isShown(entries[i])) { fire(); io.disconnect(); return; }
         }
-      }, { threshold: 0.5 });
+      }, { threshold: THRESHOLDS });
       for (var i = 0; i < els.length; i++) io.observe(els[i]);
     });
   }
