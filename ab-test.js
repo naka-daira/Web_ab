@@ -36,18 +36,10 @@
     return true;
   }
 
-  // テスト動作確認用。URLのパラメータ（?ab_group=〇〇）から強制表示するグループ名を抽出する関数
-  function forcedGroup() {
-    const match = location.search.match(/[?&]ab_group=([^&]*)/);
-    return match ? decodeURIComponent(match[1]) : null;
-  }
-
   // ユーザーをランダムにグループへ振り分け、Cookieに保存する関数
   // Cookie: ab_test_experiments_{slot} = "{method}:{group}"
   function assignGroup(test) {
     const groupProperty = 'ab_test_experiments_' + test.slot;
-    const forced = forcedGroup();
-    if (test.groups.indexOf(forced) >= 0) return { group: forced, groupProperty: groupProperty, tracked: true };
 
     const saved = (readCookie(groupProperty) || '').split(':');
     if (saved[0] === test.method && test.groups.indexOf(saved[1]) >= 0) {
