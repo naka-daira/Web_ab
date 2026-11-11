@@ -6,22 +6,22 @@
   'use strict';
 
   // Cookieの有効ドメインの設定、有効期限の設定、画面内表示とみなす割合の設定
-  var COOKIE_DOMAIN = location.hostname.endsWith('lifecard.co.jp') ? '.lifecard.co.jp' : '';
-  var COOKIE_MAX_AGE = 90 * 24 * 60 * 60;
-  var VISIBLE_RATIO = 0.5;
+  const COOKIE_DOMAIN = location.hostname.endsWith('lifecard.co.jp') ? '.lifecard.co.jp' : '';
+  const COOKIE_MAX_AGE = 90 * 24 * 60 * 60;
+  const VISIBLE_RATIO = 0.5;
 
-  var dataLayer = window.dataLayer = window.dataLayer || [];
-  var assignments = {};   // { method: { group, groupProperty, population } }
+  const dataLayer = window.dataLayer = window.dataLayer || [];
+  const assignments = {};   // { method: { group, groupProperty, population } }
 
   // 指定した名前のCookieの値を読み取る関数
   function readCookie(name) {
-    var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
     return match ? decodeURIComponent(match[1]) : null;
   }
 
   // Cookieに値を書き込む
   function writeCookie(name, value) {
-    var cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + COOKIE_MAX_AGE + '; path=/; SameSite=Lax';
+    let cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + COOKIE_MAX_AGE + '; path=/; SameSite=Lax';
     if (COOKIE_DOMAIN) cookie += '; domain=' + COOKIE_DOMAIN;
     if (location.protocol === 'https:') cookie += '; Secure';
     document.cookie = cookie;
@@ -30,7 +30,7 @@
 
   // テストの設定された実施期間内かどうかを判定する関数
   function isInPeriod(test) {
-    var now = Date.now();
+    const now = Date.now();
     if (test.start && now < new Date(test.start + 'T00:00:00+09:00').getTime()) return false;
     if (test.end && now > new Date(test.end + 'T23:59:59+09:00').getTime()) return false;
     return true;
@@ -38,23 +38,23 @@
 
   // テスト動作確認用。URLのパラメータ（?ab_group=〇〇）から強制表示するグループ名を抽出する関数
   function forcedGroup() {
-    var match = location.search.match(/[?&]ab_group=([^&]*)/);
+    const match = location.search.match(/[?&]ab_group=([^&]*)/);
     return match ? decodeURIComponent(match[1]) : null;
   }
 
   // ユーザーをランダムにグループへ振り分け、Cookieに保存する関数
   // Cookie: ab_test_experiments_{slot} = "{method}:{group}"
   function assignGroup(test) {
-    var groupProperty = 'ab_test_experiments_' + test.slot;
-    var forced = forcedGroup();
+    const groupProperty = 'ab_test_experiments_' + test.slot;
+    const forced = forcedGroup();
     if (test.groups.indexOf(forced) >= 0) return { group: forced, groupProperty: groupProperty, tracked: true };
 
-    var saved = (readCookie(groupProperty) || '').split(':');
+    const saved = (readCookie(groupProperty) || '').split(':');
     if (saved[0] === test.method && test.groups.indexOf(saved[1]) >= 0) {
       return { group: saved[1], groupProperty: groupProperty, tracked: true };
     }
     // グループの数に合わせてランダムに振り分け
-    var group = test.groups[Math.floor(Math.random() * test.groups.length)];
+    const group = test.groups[Math.floor(Math.random() * test.groups.length)];
     if (writeCookie(groupProperty, test.method + ':' + group)) {
       return { group: group, groupProperty: groupProperty, tracked: true };
     }
@@ -63,21 +63,21 @@
   }
 
   // テスト設定を読み込み、選ばれなかったグループの要素を非表示にするCSS生成・適用する処理
-  var hideRules = [];
-  var groupTokens = [];
+  const hideRules = [];
+  const groupTokens = [];
   (window.AB_TESTS || []).forEach(function (test) {
     if (!isInPeriod(test)) return;
-    var result = assignGroup(test);
+    const result = assignGroup(test);
     result.population = test.population || 'visible';
     assignments[test.method] = result;
 
-    var scope = '[data-ab-test="' + test.method + '"]';
-    var others = '[data-ab-only]:not([data-ab-only="' + result.group + '"])';
+    const scope = '[data-ab-test="' + test.method + '"]';
+    const others = '[data-ab-only]:not([data-ab-only="' + result.group + '"])';
     hideRules.push(scope + ' ' + others, scope + others);
     groupTokens.push(test.method + ':' + result.group);
   });
 
-  var style = document.createElement('style');
+  const style = document.createElement('style');
   style.textContent = hideRules.length ? hideRules.join(',') + '{display:none!important}' : '';
   document.head.appendChild(style);
   document.documentElement.setAttribute('data-ab-groups', groupTokens.join(' '));
@@ -86,9 +86,9 @@
 
   // GTMに対して、表示（population）やコンバージョン（cv）のイベントデータを送信する関数
   function send(eventName, method) {
-    var a = assignments[method];
+    const a = assignments[method];
     if (!a || !a.tracked) return;
-    var data = { event: eventName, method: method };
+    const data = { event: eventName, method: method };
     data[a.groupProperty] = a.group;   // 例: ab_test_experiments_3: 'group_a'
     dataLayer.push(data);
   }
@@ -97,15 +97,15 @@
   function isVisible(entry) {
     if (!entry.isIntersecting) return false;
     if (entry.intersectionRatio >= VISIBLE_RATIO) return true;
-    var viewportHeight = (entry.rootBounds && entry.rootBounds.height) || window.innerHeight;
+    const viewportHeight = (entry.rootBounds && entry.rootBounds.height) || window.innerHeight;
     return entry.intersectionRect.height >= viewportHeight * VISIBLE_RATIO;
   }
 
   // 要素のスクロール表示を監視し、画面に入ったタイミングで表示イベント（population）を1度だけ送る関数
   function sendPopulationWhenVisible(method, elements) {
-    var thresholds = [];
-    for (var i = 0; i <= 20; i++) thresholds.push(i / 20);
-    var observer = new IntersectionObserver(function (entries) {
+    const thresholds = [];
+    for (let i = 0; i <= 20; i++) thresholds.push(i / 20);
+    const observer = new IntersectionObserver(function (entries) {
       if (entries.some(isVisible)) {
         observer.disconnect();
         send('population', method);
@@ -117,8 +117,8 @@
   // 対象テストの要素を探し、設定に応じた方法で表示イベント（population）の計測を開始する関数
   function trackPopulation() {
     Object.keys(assignments).forEach(function (method) {
-      var a = assignments[method];
-      var targets = Array.prototype.filter.call(
+      const a = assignments[method];
+      const targets = Array.prototype.filter.call(
         document.querySelectorAll('[data-ab-test="' + method + '"]'),
         function (el) { return !el.hasAttribute('data-ab-only') || el.getAttribute('data-ab-only') === a.group; }
       );
@@ -134,16 +134,16 @@
 
   // 指定されたテストのコンバージョン（cv）イベントを送信する関数
   function convert(methods) {
-    var list = methods ? methods.split(' ') : Object.keys(assignments);
+    const list = methods ? methods.split(' ') : Object.keys(assignments);
     list.forEach(function (method) { send('cv', method); });
   }
 
   // CV対象（data-ab-cv）がクリックされたら自動でCV計測を行うイベントリスナー
   // ボタンなどにテスト名が書いてない場合は、一個上の要素にないか確認する。
   document.addEventListener('click', function (e) {
-    var el = e.target.closest && e.target.closest('[data-ab-cv]');
+    const el = e.target.closest && e.target.closest('[data-ab-cv]');
     if (!el) return;
-    var owner = el.closest('[data-ab-test]');
+    const owner = el.closest('[data-ab-test]');
     convert(el.getAttribute('data-ab-cv') || (owner && owner.getAttribute('data-ab-test')) || '');
   }, true);
 
