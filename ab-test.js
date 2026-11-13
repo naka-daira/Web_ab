@@ -1,7 +1,40 @@
 /*
- * ab-test.js
- * <head> 内、GTMスニペットより前に同期で読み込む。
- * 直前に ab-tests.config.js（window.AB_TESTS の定義）を読み込んでおく。
+ * A/Bテストの追加・期間の変更・終了の設定
+ *
+ * method     : テスト名。判定側の test_id と同じ文字列（スペース・" ・: は使わない）
+ * slot       : ab_test_experiments_{slot} の番号（1〜5）。期間が重なるテスト同士は別の番号にする
+ * groups     : グループ名。先頭は 'original'。振り分けは均等
+ * start / end: 実施期間（日本時間、両日を含む）。期間外はオリジナルが表示され、計測もされない
+ * population : 片方にしか要素がないテスト（追跡型CTAなど）のときだけ 'pageview' と書く
+ * pages      : テストを動かすページのパス。CVの到達ページ（完了ページなど）も入れる
+ *              '*' は「任意の文字列」。末尾の index.html は省略して書く（'/' と '/index.html' は同じ扱い）
+ *              例: ['/', '/apply/complete/']
+ *
+ * テストを終了するときは、勝ったパターンを本実装し、このファイルからその行を消す。
+ * end を過ぎた場合はオリジナルが表示される。
+ */
+window.AB_TESTS = [
+  {
+    method: 'ヒーローボタン改善',
+    slot: 2,
+    groups: ['original', 'group_a'],
+    start: '2026-11-06',
+    end: '2026-12-31',
+    pages: ['*/']
+  },
+  {
+    method: '追跡型CTA追加',
+    slot: 3,
+    groups: ['original', 'group_a'],
+    population: 'pageview',
+    start: '2026-11-09',
+    end: '2026-12-31',
+    pages: ['*/sticky.html']
+  }
+];
+
+/*
+ * A/Bテストの実装コード
  */
 (function () {
   'use strict';
@@ -24,9 +57,9 @@
 
   // Cookieに値を書き込む
   function writeCookie(name, value) {
-    let cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + COOKIE_MAX_AGE + '; path=/; SameSite=Lax';
+    let cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + COOKIE_MAX_AGE + '; path=/; SameSite=Lax'; 
     if (COOKIE_DOMAIN) cookie += '; domain=' + COOKIE_DOMAIN;
-    if (location.protocol === 'https:') cookie += '; Secure';
+    if (location.protocol === 'https:') cookie += '; Secure'; 
     document.cookie = cookie;
     return readCookie(name) === value;
   }
@@ -46,13 +79,9 @@
 
   // 今のページが、テストの pages のどれかに当てはまるかを判定する関数（'*' は任意の文字列）
   function isTargetPage(test) {
-    if (!Array.isArray(test.pages)) {
-      console.warn('[ab-test] pages が設定されていないため、このテストは動きません: ' + test.method);
-      return false;
-    }
     const currentPath = normalizePath(location.pathname);
-    return test.pages.some(function (page) {
-      const pattern = normalizePath(page).split('*').map(function (part) {
+    return test.pages.some((page) => {
+      const pattern = normalizePath(page).split('*').map((part) => {
         return part.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
       }).join('.*');
       return new RegExp('^' + pattern + '$').test(currentPath);
@@ -62,14 +91,17 @@
   // ユーザーをランダムにグループへ振り分け、Cookieに保存する関数
   // Cookie: ab_test_experiments_{slot} = "{method}:{group}"
   function assignGroup(test) {
-    const groupProperty = 'ab_test_experiments_' + test.slot;
+    const groupProperty = 'ab_test_experiments_' + test.slot; 
 
-    const saved = (readCookie(groupProperty) || '').split(':');
-    if (saved[0] === test.method && test.groups.indexOf(saved[1]) >= 0) {
-      return { group: saved[1], groupProperty: groupProperty, tracked: true };
+    // すでにCookieがあり、テスト名とグループが一致する場合はそのまま返す 
+    const savedCookie = (readCookie(groupProperty) || '').split(':');
+    if (savedCookie[0] === test.method && test.groups.indexOf(savedCookie[1]) >= 0) {
+      return { group: savedCookie[1], groupProperty: groupProperty, tracked: true };
     }
     // グループの数に合わせてランダムに振り分け
     const group = test.groups[Math.floor(Math.random() * test.groups.length)];
+
+    // Cookieに保存できた場合はそのグループを返す
     if (writeCookie(groupProperty, test.method + ':' + group)) {
       return { group: group, groupProperty: groupProperty, tracked: true };
     }
@@ -82,7 +114,8 @@
   const hideRules = [];
   const groupTokens = [];
   const activeMethods = [];
-  (window.AB_TESTS || []).forEach(function (test) {
+  (window.AB_TESTS || []).forEach((test) => {
+    // 期間外・対象ページ外のテストは除外
     if (!isInPeriod(test) || !isTargetPage(test)) return;
     const result = assignGroup(test);
     result.population = test.population || 'visible';
@@ -96,7 +129,7 @@
   });
 
   // 動いていないテスト（期間外・対象ページ外・設定から消したもの）は、オリジナル以外を隠す
-  const inactiveScope = '[data-ab-test]' + activeMethods.map(function (method) {
+  const inactiveScope = '[data-ab-test]' + activeMethods.map((method) => {
     return ':not([data-ab-test="' + method + '"])';
   }).join('');
   const notOriginal = '[data-ab-only]:not([data-ab-only="' + ORIGINAL_GROUP + '"])';
@@ -130,22 +163,22 @@
   function sendPopulationWhenVisible(method, elements) {
     const thresholds = [];
     for (let i = 0; i <= 20; i++) thresholds.push(i / 20);
-    const observer = new IntersectionObserver(function (entries) {
+    const observer = new IntersectionObserver((entries)=> {
       if (entries.some(isVisible)) {
         observer.disconnect();
         send('population', method);
       }
     }, { threshold: thresholds });
-    elements.forEach(function (el) { observer.observe(el); });
+    elements.forEach((el) => { observer.observe(el); });
   }
 
   // 対象テストの要素を探し、設定に応じた方法で表示イベント（population）の計測を開始する関数
   function trackPopulation() {
-    Object.keys(assignments).forEach(function (method) {
+    Object.keys(assignments).forEach((method) => {
       const a = assignments[method];
       const targets = Array.prototype.filter.call(
         document.querySelectorAll('[data-ab-test="' + method + '"]'),
-        function (el) { return !el.hasAttribute('data-ab-only') || el.getAttribute('data-ab-only') === a.group; }
+        (el) => { return !el.hasAttribute('data-ab-only') || el.getAttribute('data-ab-only') === a.group; }
       );
       if (!targets.length) return;
       if (a.population === 'pageview') send('population', method);
@@ -160,12 +193,12 @@
   // 指定されたテストのコンバージョン（cv）イベントを送信する関数
   function convert(methods) {
     const list = methods ? methods.split(' ') : Object.keys(assignments);
-    list.forEach(function (method) { send('cv', method); });
+    list.forEach((method) => { send('cv', method); });
   }
 
   // CV対象（data-ab-cv）がクリックされたら自動でCV計測を行うイベントリスナー
   // ボタンなどにテスト名が書いてない場合は、一個上の要素にないか確認する。
-  document.addEventListener('click', function (e) {
+  document.addEventListener('click', (e) => {
     const el = e.target.closest && e.target.closest('[data-ab-cv]');
     if (!el) return;
     const owner = el.closest('[data-ab-test]');
@@ -173,7 +206,7 @@
   }, true);
 
   window.abTest = {
-    group: function (method) { return assignments[method] ? assignments[method].group : null; },
+    group: (method) => { return assignments[method] ? assignments[method].group : null; },
     convert: convert
   };
 })();
