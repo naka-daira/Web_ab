@@ -4,8 +4,8 @@
 
 | ファイル | 役割 | 直すタイミング |
 |---|---|---|
-| `ab-tests.config.js` | テストの設定（テスト名・スロット・グループ・期間・対象ページ） | テストの追加・期間の変更・終了のたび |
-| `ab-test.js` | 振り分け・表示の切り替え・計測の本体 | 基本的に直さない |
+| `ab-test.js` | 冒頭の `window.AB_TESTS`：テストの設定（テスト名・スロット・グループ・期間・対象ページ） | テストの追加・期間の変更・終了のたび |
+| | それより下：振り分け・表示の切り替え・計測の本体 | 基本的に直さない |
 | `index.html` / `sticky.html` | 検証用ページ（出し分けの要素とCSSはページ側に書く） | テストの内容を作るとき |
 | `debug.js` | 検証用の確認パネル | 本番には入れない |
 
@@ -15,11 +15,9 @@
 <style>
   html:not(.ab-ready) [data-ab-only]:not([data-ab-only="original"]) { display: none; }
 </style>
-<script src="/js/ab-tests.config.js"></script>
 <script src="/js/ab-test.js"></script>
 ```
 
-- 設定ファイルは、必ず `ab-test.js` より前に読み込みます。
 - `async` や `defer` は付けません（理由は「表示切り替えの仕組み」の「ちらつきを防ぐしくみ」を参照）。
 
 ---
@@ -33,7 +31,7 @@
 | 順番 | どこで | 何をするか |
 |---|---|---|
 | ① | `<head>` の `<style>` | `ab-ready` が付くまで、`original` 以外の要素を隠す |
-| ② | `ab-tests.config.js` | `window.AB_TESTS` にテストの設定を入れる |
+| ② | `ab-test.js`（冒頭） | `window.AB_TESTS` にテストの設定を入れる |
 | ③ | `ab-test.js` | テストごとに「このページで動かすか」を判定する（期間と `pages`） |
 | ④ | `ab-test.js` | 動かすテストについて、Cookieを見てグループを決める |
 | ⑤ | `ab-test.js` | 選ばれなかったグループの要素を隠すCSSを作り、`<head>` に追加する |
@@ -96,7 +94,7 @@ Cookie `ab_test_experiments_{slot}` に `テスト名:グループ名` の形で
 [data-ab-test]:not([data-ab-test="動いているテスト1"]):not(...)[data-ab-only]:not([data-ab-only="original"])
 ```
 
-- Bは「動いているテスト以外のすべての `data-ab-test`」に当てはまります。そのため、期間外のテスト、対象ページ外のテスト、設定ファイルから消したテストは、どれも `original` の表示になります。
+- Bは「動いているテスト以外のすべての `data-ab-test`」に当てはまります。そのため、期間外のテスト、対象ページ外のテスト、`AB_TESTS` から消したテストは、どれも `original` の表示になります。
 - 動いているテストが1つもないときは、`:not(...)` がなくなり、すべての `data-ab-test` が対象になります。
 
 **セレクタを2つ書いている理由**
@@ -138,9 +136,8 @@ html[data-ab-groups~="ヒーローボタン改善:group_a"] .home-hero-button__t
 | 動いている（期間内・対象ページ） | 選ばれたグループ | 送る |
 | 期間外 | `original` | 送らない |
 | 対象ページ外 | `original` | 送らない |
-| 設定ファイルからテストを消した | `original` | 送らない |
+| `AB_TESTS` からテストを消した | `original` | 送らない |
 | Cookieを保存できない端末 | `original` | 送らない |
-| 設定ファイルの読み込みに失敗 | `original` | 送らない |
 | `ab-test.js` の読み込みに失敗 | `original`（①の初期CSS） | 送らない |
 
 ### 例：sticky.html で group_a に振り分けられたとき
@@ -179,5 +176,5 @@ if (abTest.group('追跡型CTA追加') !== 'group_a') return;   // group_a 以�
 - オリジナルのグループ名は `original` にしてください。動いていないテストでは、この名前の要素を表示します。
 - `data-ab-only` は、必ず `data-ab-test` の中（またはその要素自身）に付けてください。外に付けると、どのグループでも表示されます。
 - CVの到達ページ（完了ページなど）も `pages` に入れてください。入れないとCVが送られません。
-- `ab-tests.config.js` がブラウザやCDNに長くキャッシュされると、期間の変更がすぐに反映されません。このファイルだけキャッシュ時間を短くするか、`ab-tests.config.js?v=20261110` のようにバージョンを付けてください。
+- `ab-test.js` がブラウザやCDNに長くキャッシュされると、期間の変更がすぐに反映されません。このファイルのキャッシュ時間を短くするか、`ab-test.js?v=20261110` のようにバージョンを付けてください。
 - 検証用ページの `pages` は、置き場所に関係なく動くように `'*/'` と書いています。本番では `'/'` や `'/apply/complete/'` のように正確なパスで書いてください。
